@@ -1,0 +1,31 @@
+{
+  "RoleName": "sentinelshare-task-role",
+  "Description": "Runtime role assumed by the running ECS container. Grants S3 access only.",
+  "AssumeRolePolicyDocument": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "ecs-tasks.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  },
+  "InlinePolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "S3FileOperations",
+        "Effect": "Allow",
+        "Action": [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:DeleteObject"
+        ],
+        "Resource": "arn:aws:s3:::YOUR_BUCKET_NAME/uploads/*"
+      }
+    ]
+  }
+}

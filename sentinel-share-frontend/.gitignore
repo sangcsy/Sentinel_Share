@@ -1,0 +1,6 @@
+node_modules/
+.next/
+
+# 런타임 환경변수 — 커밋 금지
+.env.local
+.env

@@ -1,0 +1,49 @@
+'use strict';
+
+const { body } = require('express-validator');
+const { validateRequest } = require('../middleware/validateRequest');
+const AuthService = require('../services/auth.service');
+
+const signupValidation = [
+  body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters')
+    .matches(/[A-Z]/).withMessage('Password must contain an uppercase letter')
+    .matches(/[0-9]/).withMessage('Password must contain a number'),
+  validateRequest,
+];
+
+const loginValidation = [
+  body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+  body('password').notEmpty().withMessage('Password required'),
+  validateRequest,
+];
+
+async function signup(req, res) {
+  try {
+    const { email, password } = req.body;
+    const result = await AuthService.signup({ email, password });
+    return res.status(201).json({
+      token: result.token,
+      user: { id: result.user.id, email: result.user.email, role: result.user.role },
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+}
+
+async function login(req, res) {
+  try {
+    const { email, password } = req.body;
+    const result = await AuthService.login({ email, password });
+    return res.status(200).json({
+      token: result.token,
+      user: result.user,
+    });
+  } catch (err) {
+    return res.status(err.statusCode || 500).json({ error: err.message });
+  }
+}
+
+module.exports = { signup, login, signupValidation, loginValidation };

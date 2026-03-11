@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ss-postgres
+    environment:
+      POSTGRES_DB: sentinelshare
+      POSTGRES_USER: sentinelshare_user
+      POSTGRES_PASSWORD: localpassword
+    ports:
+      - '5432:5432'
+    volumes:
+      - ss-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sentinelshare_user -d sentinelshare']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  localstack:
+    image: localstack/localstack:3
+    container_name: ss-localstack
+    ports:
+      - '4566:4566'
+    environment:
+      SERVICES: s3
+      DEFAULT_REGION: ap-northeast-2
+      EAGER_SERVICE_LOADING: 1
+    volumes:
+      - ss-localstack-data:/var/lib/localstack
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:4566/_localstack/health | grep -qE "\"s3\": \"(available|running)\""']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  ss-postgres-data:
+  ss-localstack-data:

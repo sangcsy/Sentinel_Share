@@ -1,0 +1,35 @@
+'use strict';
+
+const { Pool } = require('pg');
+const env = require('./env');
+
+const pool = new Pool({
+  host: env.DB_HOST,
+  port: env.DB_PORT,
+  database: env.DB_NAME,
+  user: env.DB_USER,
+  password: env.DB_PASSWORD,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  ssl: env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : false,
+});
+
+pool.on('error', (err) => {
+  console.error('[DB] Unexpected pool error:', err.message);
+});
+
+/**
+ * Execute a parameterized query.
+ * Always use this instead of pool.query directly to enforce prepared statements.
+ */
+async function query(text, params) {
+  const start = Date.now();
+  const result = await pool.query(text, params);
+  if (env.NODE_ENV !== 'production') {
+    console.debug(`[DB] query: ${text} | duration: ${Date.now() - start}ms`);
+  }
+  return result;
+}
+
+module.exports = { query, pool };

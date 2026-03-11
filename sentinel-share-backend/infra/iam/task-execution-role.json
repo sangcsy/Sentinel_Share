@@ -1,0 +1,44 @@
+{
+  "RoleName": "sentinelshare-task-execution-role",
+  "Description": "Allows ECS to pull images from ECR and inject secrets from Secrets Manager",
+  "AssumeRolePolicyDocument": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": {
+          "Service": "ecs-tasks.amazonaws.com"
+        },
+        "Action": "sts:AssumeRole"
+      }
+    ]
+  },
+  "ManagedPolicies": [
+    "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+  ],
+  "InlinePolicy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Sid": "AllowSecretsManagerRead",
+        "Effect": "Allow",
+        "Action": [
+          "secretsmanager:GetSecretValue"
+        ],
+        "Resource": [
+          "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:sentinelshare/*"
+        ]
+      },
+      {
+        "Sid": "AllowCloudWatchLogs",
+        "Effect": "Allow",
+        "Action": [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Resource": "arn:aws:logs:ap-northeast-2:ACCOUNT_ID:log-group:/ecs/sentinelshare-backend:*"
+      }
+    ]
+  }
+}
