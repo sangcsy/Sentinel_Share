@@ -3,4 +3,15 @@ node_modules/
 .env
 .env.local
 
+# 빌드 아티팩트
+*.tsbuildinfo
+
+# 로그
+*.log
+*.err.log
+*.out.log
+
+# Claude Code 전용 파일 (로컬에서만 사용)
 CLAUDE.md
+AGENTS.md
+prompt.txt

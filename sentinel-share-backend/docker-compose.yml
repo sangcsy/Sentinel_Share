@@ -33,6 +33,26 @@ services:
       timeout: 5s
       retries: 20
 
+  # ─── Attack Dashboard (선택 사항) ────────────────────────────
+  # 호스트에서 직접 실행할 경우: cd ../attack-dashboard && npm run dev
+  # Docker로 실행할 경우 아래 주석 해제
+  #
+  # attack-dashboard:
+  #   build:
+  #     context: ../attack-dashboard
+  #     dockerfile: Dockerfile.dev
+  #   container_name: ss-attack-dashboard
+  #   ports:
+  #     - '3002:3002'
+  #   environment:
+  #     VULNERABLE_API_URL: http://host.docker.internal:3000
+  #     LOCALSTACK_URL: http://localstack:4566
+  #     VULNERABLE_S3_BUCKET: sentinelshare-local
+  #     AWS_API_URL: ''
+  #   depends_on:
+  #     localstack:
+  #       condition: service_healthy
+
 volumes:
   ss-postgres-data:
   ss-localstack-data:

@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #080c14;
+  --bg-card: #0d1117;
+  --bg-card-hover: #111827;
+  --border: #1e2433;
+  --text-primary: #e2e8f0;
+  --text-dim: #64748b;
+  --red: #f87171;
+  --green: #4ade80;
+  --yellow: #fbbf24;
+  --orange: #fb923c;
+}
+
+html {
+  background-color: var(--bg-primary);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* 스크롤바 스타일 */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #0d1117;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e2433;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2d3748;
+}
+
+/* 코드/로그 폰트 */
+.font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+/* 글리치 효과 (헤더용) */
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.8; }
+  94% { opacity: 1; }
+  96% { opacity: 0.9; }
+  97% { opacity: 1; }
+}
+
+.text-flicker {
+  animation: flicker 4s infinite;
+}
+
+/* 스캔라인 오버레이 */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}

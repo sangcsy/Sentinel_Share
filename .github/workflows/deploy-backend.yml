@@ -1,0 +1,127 @@
+name: Deploy Backend to ECS
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'sentinel-share-backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:  # 수동 실행 허용
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: sentinelshare-backend
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # 1. Docker 이미지 빌드 & ECR 푸시 (한 번만)
+  # attack-dashboard는 이 워크플로우에 포함되지 않음
+  # ──────────────────────────────────────────────────────────────
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag output
+        id: meta
+        run: |
+          echo "tag=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./sentinel-share-backend
+          file: ./sentinel-share-backend/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+  # ──────────────────────────────────────────────────────────────
+  # 2. 취약 환경 배포 (No WAF, Public S3)
+  # ──────────────────────────────────────────────────────────────
+  deploy-vulnerable:
+    name: Deploy → Vulnerable (No WAF)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: vulnerable
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Render task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: sentinel-share-backend/infra/ecs-task-definition-vulnerable.json
+          container-name: sentinelshare-backend
+          image: ${{ needs.build.outputs.image-tag }}
+
+      - name: Deploy to ECS (Vulnerable)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ secrets.VULN_ECS_SERVICE }}
+          cluster: ${{ secrets.VULN_ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  # ──────────────────────────────────────────────────────────────
+  # 3. 보안 환경 배포 (CloudFront + WAF + Private S3)
+  # ──────────────────────────────────────────────────────────────
+  deploy-secure:
+    name: Deploy → Secure (WAF + CloudFront)
+    needs: build
+    runs-on: ubuntu-latest
+    environment: secure
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Render task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: sentinel-share-backend/infra/ecs-task-definition-secure.json
+          container-name: sentinelshare-backend
+          image: ${{ needs.build.outputs.image-tag }}
+
+      - name: Deploy to ECS (Secure)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ secrets.SECURE_ECS_SERVICE }}
+          cluster: ${{ secrets.SECURE_ECS_CLUSTER }}
+          wait-for-service-stability: true

@@ -43,5 +43,8 @@ module.exports = {
     'image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,application/zip'
   ).split(','),
 
-  CORS_ORIGIN: process.env.CORS_ORIGIN || 'http://localhost:3001',
+  CORS_ORIGIN: (process.env.CORS_ORIGIN || 'http://localhost:3001')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 };

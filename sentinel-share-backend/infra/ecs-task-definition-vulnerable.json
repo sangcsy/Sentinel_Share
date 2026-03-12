@@ -1,0 +1,79 @@
+{
+  "family": "sentinelshare-backend-vulnerable",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/sentinelshare-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/sentinelshare-task-role-vulnerable",
+  "containerDefinitions": [
+    {
+      "name": "sentinelshare-backend",
+      "image": "ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com/sentinelshare-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "NODE_ENV",           "value": "production" },
+        { "name": "PORT",               "value": "3000" },
+        { "name": "AWS_REGION",         "value": "ap-northeast-2" },
+        { "name": "PRESIGNED_URL_TTL",  "value": "300" },
+        { "name": "MAX_FILE_SIZE_MB",   "value": "100" },
+        { "name": "JWT_EXPIRES_IN",     "value": "1h" },
+        { "name": "ALLOWED_MIME_TYPES", "value": "image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,application/zip" }
+      ],
+      "secrets": [
+        {
+          "name": "JWT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:sentinelshare/vulnerable/jwt-secret"
+        },
+        {
+          "name": "DB_HOST",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:sentinelshare/vulnerable/db-credentials:host::"
+        },
+        {
+          "name": "DB_NAME",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:sentinelshare/vulnerable/db-credentials:dbname::"
+        },
+        {
+          "name": "DB_USER",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:sentinelshare/vulnerable/db-credentials:username::"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:sentinelshare/vulnerable/db-credentials:password::"
+        },
+        {
+          "name": "S3_BUCKET_NAME",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:sentinelshare/vulnerable/s3-bucket-name"
+        },
+        {
+          "name": "CORS_ORIGIN",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:sentinelshare/vulnerable/cors-origin"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/sentinelshare-backend-vulnerable",
+          "awslogs-region": "ap-northeast-2",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:3000/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 15
+      }
+    }
+  ]
+}

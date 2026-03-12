@@ -1,0 +1,90 @@
+name: Deploy Attack Dashboard to ECS
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'attack-dashboard/**'
+      - '.github/workflows/deploy-dashboard.yml'
+  workflow_dispatch:  # 수동 실행 허용
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REPOSITORY: sentinelshare-dashboard
+
+jobs:
+  # ──────────────────────────────────────────────────────────────
+  # 1. Docker 이미지 빌드 & ECR 푸시
+  # ──────────────────────────────────────────────────────────────
+  build:
+    name: Build & Push Dashboard Image
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag output
+        id: meta
+        run: |
+          echo "tag=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./attack-dashboard
+          file: ./attack-dashboard/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.meta.outputs.tag }}
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+  # ──────────────────────────────────────────────────────────────
+  # 2. Attack Dashboard ECS 배포
+  # ──────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy → Attack Dashboard
+    needs: build
+    runs-on: ubuntu-latest
+    environment: dashboard
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Render task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: attack-dashboard/infra/ecs-task-definition-dashboard.json
+          container-name: sentinelshare-dashboard
+          image: ${{ needs.build.outputs.image-tag }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ secrets.DASHBOARD_ECS_SERVICE }}
+          cluster: ${{ secrets.DASHBOARD_ECS_CLUSTER }}
+          wait-for-service-stability: true

@@ -1,31 +1,66 @@
-# SentinelShare
+# SentinelShare — Cloud Security Impact Simulator
 
-인증된 사용자가 파일을 업로드하고, 만료되는 보안 링크로 공유할 수 있는 클라우드 파일 공유 플랫폼.
+클라우드 인프라 보안 효과를 실시간으로 측정하고 시각화하는 플랫폼.
+
+파일 공유 서비스를 **동일한 애플리케이션 코드**로 취약/보안 두 AWS 환경에 배포하고,
+공격 시뮬레이터 대시보드에서 직접 공격을 수행하여 결과를 나란히 비교한다.
+인프라 보안(WAF, CloudFront, Private S3, Security Group)이 실제로 어떤 효과를 내는지
+숫자와 시각으로 증명한다.
 
 ---
 
 ## 아키텍처
 
+### 전체 구성도
+
 ```
-[Browser]
-    │
-    ▼
-[CloudFront + WAF]        HTTPS 종료, 엣지 캐싱, OWASP 룰셋
-    │
-    ▼
-[ECS Fargate]             Node.js/Express API (CloudFront IP 제한으로 직접 접근 차단)
-    │           │
-    ▼           ▼
-[RDS PostgreSQL]    [S3]  프라이빗 버킷 — presigned URL로만 다운로드
-(Private Subnet)
+┌─────────────────────────────────────────────────────────────────────┐
+│                         Attack Dashboard                            │
+│                    (공격자 포지션 시뮬레이터)                           │
+│            브루트포스 / S3 직접접근 / API 플러드                         │
+└───────────────┬─────────────────────────┬───────────────────────────┘
+                │                         │
+                ▼                         ▼
+┌──────────────────────┐     ┌──────────────────────────────────────┐
+│   취약 환경 (Vulnerable) │     │         보안 환경 (Secure)             │
+│                      │     │                                      │
+│  [ECS Fargate]       │     │  [CloudFront + WAF]                  │
+│  SG: 0.0.0.0/0:3000  │     │  Rate-based rule + Managed Rules     │
+│       │              │     │          │                           │
+│       ▼              │     │          ▼                           │
+│  [PostgreSQL RDS]    │     │  [ECS Fargate]                       │
+│  [S3 Public Bucket]  │     │  SG: CloudFront IP(pl-3b927c52)만    │
+│  직접 접근 가능        │     │       │              │               │
+│                      │     │       ▼              ▼               │
+│                      │     │  [PostgreSQL RDS] [S3 Private]       │
+│                      │     │                  presigned URL 전용   │
+└──────────────────────┘     └──────────────────────────────────────┘
+                                           │
+                                           ▼
+                              ┌────────────────────────┐
+                              │   SIEM (4단계 계획)      │
+                              │  Prometheus + Grafana   │
+                              │  + Loki                 │
+                              │  공격 패턴 / WAF 차단    │
+                              │  실시간 대시보드          │
+                              └────────────────────────┘
 ```
 
-**주요 설계 결정:**
-- ALB 없음 — CloudFront가 HTTPS/CDN 처리, ECS Security Group에서 CloudFront IP만 허용
-- ECS Fargate (EKS 아님) — 운영 부담 최소화, MVP에 비용 효율적
-- PostgreSQL — users/files/shared_links 관계형 모델에 적합
-- Presigned URL — S3 직접 노출 없음, 백엔드가 권한 검사 후 URL 발급
-- Secrets Manager — 코드와 환경 파일에 시크릿 없음
+**핵심 설계 원칙:**
+- 동일 코드, 다른 인프라 — 앱 레벨에 rate limit 없음. WAF가 인프라 레벨에서 담당
+- ALB 없음 — CloudFront가 HTTPS/CDN 처리. ECS SG에서 CloudFront IP(`pl-3b927c52`)만 허용
+- Presigned URL — S3 직접 노출 없음. 백엔드 권한 검사 후 5분 TTL URL 발급
+- Secrets Manager — 코드와 환경 파일에 시크릿 없음. ECS 태스크 시작 시 주입
+
+---
+
+## 공격 시뮬레이션 비교
+
+| 공격 시나리오 | 취약 환경 결과 | 보안 환경 결과 |
+|---|---|---|
+| 브루트포스 로그인 (30회) | 30/30 서버 도달 | WAF Rate Rule → 차단 |
+| S3 버킷 직접 접근 (5경로) | 200 OK (파일 노출) | 403 AccessDenied |
+| API 플러드 (60회) | 60/60 서버 도달 | WAF 임계값 초과 → 차단 |
 
 ---
 
@@ -33,10 +68,15 @@
 
 ```
 SentinelShare/
-├── sentinel-share-backend/
+├── .github/
+│   └── workflows/
+│       ├── deploy-backend.yml        백엔드 ECS 배포 (취약/보안 동시)
+│       └── deploy-dashboard.yml      Attack Dashboard 배포 (1단계 계획)
+│
+├── sentinel-share-backend/           Node.js/Express API
 │   ├── src/
 │   │   ├── config/        db.js, s3.js, env.js
-│   │   ├── middleware/    authenticate.js, rateLimiter.js, validateRequest.js
+│   │   ├── middleware/    authenticate.js, rateLimiter.js (apiLimiter만 — authLimiter 제거)
 │   │   ├── controllers/   auth.controller.js, files.controller.js
 │   │   ├── services/      auth.service.js, files.service.js, s3.service.js
 │   │   ├── models/        user.model.js, file.model.js, sharedLink.model.js
@@ -46,22 +86,38 @@ SentinelShare/
 │   ├── migrations/        001_initial_schema.sql
 │   ├── scripts/           local-init.sh
 │   ├── infra/
-│   │   ├── iam/           task-execution-role.json, task-role.json
-│   │   ├── scripts/       deploy.sh
-│   │   ├── ecs-task-definition.json
+│   │   ├── iam/                            task-execution-role.json, task-role.json
+│   │   ├── ecs-task-definition-vulnerable.json
+│   │   ├── ecs-task-definition-secure.json
 │   │   └── s3-bucket-policy.json
 │   ├── docker-compose.yml
-│   ├── Dockerfile
-│   └── .env.local         (로컬 개발용 — 커밋 금지)
+│   └── Dockerfile
 │
-└── sentinel-share-frontend/
-    ├── app/
-    │   ├── (auth)/        login/, signup/
-    │   ├── dashboard/     파일 목록 + 업로드
-    │   └── shared/[token] 공개 공유 링크 페이지
-    ├── components/        FileList, FileUploadForm, ShareLinkModal, AuthGuard
-    ├── lib/               api.ts, auth.ts
-    └── types/             index.ts
+├── sentinel-share-frontend/          Next.js 15 App Router
+│   ├── app/
+│   │   ├── (auth)/        login/, signup/
+│   │   ├── dashboard/     파일 목록 + 업로드
+│   │   └── shared/[token] 공개 공유 링크 페이지
+│   ├── components/        FileList, FileUploadForm, ShareLinkModal, AuthGuard
+│   └── lib/               api.ts, auth.ts
+│
+├── attack-dashboard/                 보안 비교 시뮬레이터 (AWS 배포 예정)
+│   ├── app/
+│   │   ├── api/attack/    bruteforce, s3-access, ratelimit (SSE 스트림)
+│   │   ├── api/config/    환경 설정 정보
+│   │   └── page.tsx       메인 비교 대시보드
+│   ├── components/        AttackCard, RequestLog, MetricsPanel, EnvironmentStatus
+│   └── .env.local.example
+│
+├── docs/                             인프라 설치 가이드북 (작성 예정)
+│   ├── 01-prerequisites.md
+│   ├── 02-vulnerable-environment.md
+│   ├── 03-secure-environment.md
+│   └── 04-attack-dashboard-setup.md
+│
+└── infra/                            IaC & 모니터링 (작성 예정)
+    ├── terraform/                    취약/보안 환경 Terraform 모듈
+    └── monitoring/                   Prometheus + Grafana + Loki
 ```
 
 ---
@@ -70,7 +126,7 @@ SentinelShare/
 
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
-| POST | `/auth/signup` | — | 회원가입 |
+| POST | `/auth/signup` | — | 회원가입 (비밀번호: 8자+대문자+숫자) |
 | POST | `/auth/login` | — | 로그인, JWT 반환 |
 | POST | `/files/upload` | JWT | 파일 업로드 (multipart/form-data, field: `file`) |
 | GET | `/files` | JWT | 내 파일 목록 |
@@ -78,7 +134,7 @@ SentinelShare/
 | DELETE | `/files/:id` | JWT | 파일 삭제 (soft delete + S3 삭제) |
 | POST | `/files/:id/share` | JWT | 공유 링크 생성 (`{ expiresInHours: 1–168 }`) |
 | GET | `/shared/:token/download` | — | 공유 토큰으로 presigned URL 발급 |
-| GET | `/health` | — | 헬스체크 |
+| GET | `/health` | — | 헬스체크 (ECS) |
 
 ---
 
@@ -92,7 +148,7 @@ shared_links  id, file_id, token, expires_at, created_by, created_at
 
 ---
 
-## 로컬 개발 (LocalStack)
+## 로컬 개발
 
 ### 사전 준비
 
@@ -105,7 +161,7 @@ shared_links  id, file_id, token, expires_at, created_by, created_at
 
 > **Windows 주의사항**
 > `winget install PostgreSQL.PostgreSQL.16` 으로 설치하면 PostgreSQL 서버도 함께 설치되어
-> 5432 포트를 점유합니다. 아래 명령어를 **관리자 권한 PowerShell**에서 실행해 비활성화하세요:
+> 5432 포트를 점유합니다. **관리자 권한 PowerShell**에서 실행해 비활성화하세요:
 > ```powershell
 > Stop-Service -Name 'postgresql-x64-16' -Force
 > Set-Service -Name 'postgresql-x64-16' -StartupType Disabled
@@ -114,203 +170,106 @@ shared_links  id, file_id, token, expires_at, created_by, created_at
 ### 실행 순서
 
 ```bash
-# 1. 백엔드 디렉토리로 이동
+# 1. 백엔드
 cd sentinel-share-backend
-
-# 2. PostgreSQL + LocalStack 컨테이너 시작
 docker compose up -d
-
-# 3. S3 버킷 생성 + DB 마이그레이션 (최초 1회만 실행)
-bash scripts/local-init.sh
-
-# 4. 백엔드 시작
+bash scripts/local-init.sh    # 최초 1회
 cp .env.local .env
-npm install
-npm run dev
-```
+npm install && npm run dev    # → http://localhost:3000
 
-```bash
-# 5. 프론트엔드 시작 (새 터미널)
+# 2. 프론트엔드 (새 터미널)
 cd sentinel-share-frontend
 echo "NEXT_PUBLIC_API_URL=http://localhost:3000" > .env.local
-npm install
-npm run dev -- -p 3001
+npm install && npm run dev -- -p 3001    # → http://localhost:3001
+
+# 3. 공격 대시보드 (새 터미널)
+cd attack-dashboard
+cp .env.local.example .env.local    # AWS URL은 배포 후 채워넣기
+npm install && npm run dev          # → http://localhost:3002
 ```
-
-- 백엔드: http://localhost:3000
-- 프론트엔드: http://localhost:3001
-
-### 회원가입 비밀번호 규칙
-
-백엔드에서 아래 조건을 모두 검사합니다:
-- 8자 이상
-- 대문자 1개 이상
-- 숫자 1개 이상
-
-예시: `Test1234`
 
 ### DB 직접 접속
 
-**터미널 (psql):**
 ```bash
-# Windows Git Bash 기준
 export PATH="$PATH:/c/Program Files/PostgreSQL/16/bin"
 export PGPASSWORD="localpassword"
 psql -h 127.0.0.1 -p 5432 -U sentinelshare_user -d sentinelshare
 ```
 
-> `localhost` 대신 `127.0.0.1` 사용 — Windows에서 localhost가 IPv6(::1)로 해석되어
-> 접속 실패할 수 있음.
-
-**유용한 psql 명령어:**
-```sql
-\dt                                         -- 테이블 목록
-SELECT id, email, role FROM users;          -- 가입된 유저 확인
-SELECT id, original_name, is_deleted, stored_key FROM files;  -- 파일 목록
-SELECT id, token, expires_at FROM shared_links;               -- 공유 링크 목록
-\q                                          -- 종료
-```
-
-**GUI 툴 (DBeaver, TablePlus 등):**
-
-| 항목 | 값 |
-|---|---|
-| Type | PostgreSQL |
-| Host | 127.0.0.1 |
-| Port | 5432 |
-| Database | sentinelshare |
-| User | sentinelshare_user |
-| Password | localpassword |
-
-### LocalStack S3 직접 확인
-
-```bash
-# 버킷 내 파일 목록
-aws --endpoint-url=http://localhost:4566 \
-  s3 ls s3://sentinelshare-local/uploads/ --recursive
-
-# 특정 파일 다운로드
-aws --endpoint-url=http://localhost:4566 \
-  s3 cp s3://sentinelshare-local/<stored_key> ./downloaded_file
-```
-
-### 컨테이너 상태 확인
-
-```bash
-docker compose ps          # 컨테이너 상태
-docker compose logs -f     # 전체 로그
-docker compose down        # 컨테이너 중지 (데이터 유지)
-docker compose down -v     # 컨테이너 + 데이터 볼륨 삭제
-```
-
-> **데이터 영속성:** `docker compose down` 해도 `ss-postgres-data` named volume에 데이터가 유지됩니다.
-> 완전히 초기화하려면 `docker compose down -v` 후 `local-init.sh`를 다시 실행하세요.
+> `localhost` 대신 `127.0.0.1` 사용 — Windows에서 localhost가 IPv6(::1)로 해석될 수 있음.
 
 ---
 
 ## AWS 배포
 
-### 1. 사전 준비
+### 사전 준비
 
 ```bash
-# AWS CLI 설정
 aws configure
-
-# ECR 리포지토리 생성
 aws ecr create-repository --repository-name sentinelshare-backend --region ap-northeast-2
 ```
 
-### 2. Secrets Manager 설정
+### 취약 환경 (Vulnerable)
 
 ```bash
-# JWT 시크릿
-aws secretsmanager create-secret \
-  --name sentinelshare/jwt-secret \
-  --secret-string "$(openssl rand -base64 48)"
-
-# DB 접속 정보 (RDS 생성 후 엔드포인트 입력)
-aws secretsmanager create-secret \
-  --name sentinelshare/db-credentials \
-  --secret-string '{"host":"YOUR_RDS_ENDPOINT","dbname":"sentinelshare","username":"sentinelshare_user","password":"YOUR_PASSWORD"}'
-
-# S3 버킷명
-aws secretsmanager create-secret \
-  --name sentinelshare/s3-bucket-name \
-  --secret-string "your-sentinelshare-bucket"
-
-# CORS origin (CloudFront 도메인)
-aws secretsmanager create-secret \
-  --name sentinelshare/cors-origin \
-  --secret-string "https://your-cloudfront-domain.cloudfront.net"
-```
-
-### 3. S3 버킷
-
-```bash
+# S3 버킷 — Block Public Access OFF (의도적 취약 설정)
 aws s3api create-bucket \
-  --bucket your-sentinelshare-bucket \
+  --bucket your-vulnerable-bucket \
   --region ap-northeast-2 \
   --create-bucket-configuration LocationConstraint=ap-northeast-2
 
-# 퍼블릭 접근 완전 차단
 aws s3api put-public-access-block \
-  --bucket your-sentinelshare-bucket \
+  --bucket your-vulnerable-bucket \
+  --public-access-block-configuration \
+    "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+
+# ECS 클러스터 + 로그 그룹
+aws ecs create-cluster --cluster-name sentinelshare-vulnerable
+aws logs create-log-group --log-group-name /ecs/sentinelshare-backend-vulnerable
+
+# Security Group: 0.0.0.0/0 포트 3000 (의도적 취약 설정)
+
+# Secrets Manager
+aws secretsmanager create-secret \
+  --name sentinelshare/vulnerable/jwt-secret \
+  --secret-string "$(openssl rand -base64 48)"
+
+aws secretsmanager create-secret \
+  --name sentinelshare/vulnerable/db-credentials \
+  --secret-string '{"host":"VULN_RDS_ENDPOINT","dbname":"sentinelshare","username":"sentinelshare_user","password":"YOUR_PASSWORD"}'
+
+aws secretsmanager create-secret \
+  --name sentinelshare/vulnerable/s3-bucket-name \
+  --secret-string "your-vulnerable-bucket"
+
+aws secretsmanager create-secret \
+  --name sentinelshare/vulnerable/cors-origin \
+  --secret-string "http://your-vulnerable-frontend-domain"
+```
+
+### 보안 환경 (Secure)
+
+```bash
+# S3 버킷 — Block Public Access ON
+aws s3api create-bucket \
+  --bucket your-secure-bucket \
+  --region ap-northeast-2 \
+  --create-bucket-configuration LocationConstraint=ap-northeast-2
+
+aws s3api put-public-access-block \
+  --bucket your-secure-bucket \
   --public-access-block-configuration \
     "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
 
-# 버킷 정책 적용 (ACCOUNT_ID와 버킷명 교체 후)
 aws s3api put-bucket-policy \
-  --bucket your-sentinelshare-bucket \
-  --policy file://infra/s3-bucket-policy.json
-```
+  --bucket your-secure-bucket \
+  --policy file://sentinel-share-backend/infra/s3-bucket-policy.json
 
-### 4. IAM 역할
-
-```bash
-# Task Execution Role (ECR 이미지 pull + Secrets Manager 읽기)
-aws iam create-role \
-  --role-name sentinelshare-task-execution-role \
-  --assume-role-policy-document file://infra/iam/task-execution-role.json
-
-aws iam attach-role-policy \
-  --role-name sentinelshare-task-execution-role \
-  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
-
-# Task Role (런타임 S3 접근)
-aws iam create-role \
-  --role-name sentinelshare-task-role \
-  --assume-role-policy-document file://infra/iam/task-role.json
-```
-
-### 5. ECS 설정
-
-```bash
-# 클러스터 생성
-aws ecs create-cluster --cluster-name sentinelshare-cluster
-
-# CloudWatch 로그 그룹 생성
+# ECS 클러스터 + 로그 그룹
+aws ecs create-cluster --cluster-name sentinelshare-secure
 aws logs create-log-group --log-group-name /ecs/sentinelshare-backend
 
-# 배포 (환경변수 설정 후 실행)
-export AWS_ACCOUNT_ID=123456789012
-export AWS_REGION=ap-northeast-2
-bash infra/scripts/deploy.sh
-```
-
-### 6. CloudFront + WAF
-
-1. WAF Web ACL 생성:
-   - AWS Managed Rules (AWSManagedRulesCommonRuleSet) 적용
-   - Rate-based rule: IP당 5분/100회 제한
-2. CloudFront 배포 생성:
-   - Origin: ECS 태스크 퍼블릭 IP 또는 DNS
-   - WAF Web ACL 연결
-   - HTTPS only (HTTP → HTTPS 리다이렉트)
-
-### 7. ECS Security Group 설정
-
-```bash
-# CloudFront 관리형 프리픽스 리스트만 포트 3000 허용
+# Security Group: CloudFront 관리형 프리픽스 리스트만 허용
 aws ec2 authorize-security-group-ingress \
   --group-id sg-XXXXXXXX \
   --ip-permissions '[{
@@ -319,29 +278,91 @@ aws ec2 authorize-security-group-ingress \
     "ToPort": 3000,
     "PrefixListIds": [{"PrefixListId": "pl-3b927c52"}]
   }]'
+
+# Secrets Manager
+aws secretsmanager create-secret \
+  --name sentinelshare/jwt-secret \
+  --secret-string "$(openssl rand -base64 48)"
+
+aws secretsmanager create-secret \
+  --name sentinelshare/db-credentials \
+  --secret-string '{"host":"SECURE_RDS_ENDPOINT","dbname":"sentinelshare","username":"sentinelshare_user","password":"YOUR_PASSWORD"}'
+
+aws secretsmanager create-secret \
+  --name sentinelshare/s3-bucket-name \
+  --secret-string "your-secure-bucket"
+
+aws secretsmanager create-secret \
+  --name sentinelshare/cors-origin \
+  --secret-string "https://your-cloudfront-domain.cloudfront.net"
 ```
+
+#### CloudFront + WAF
+
+1. WAF Web ACL 생성:
+   - AWS Managed Rules: `AWSManagedRulesCommonRuleSet`
+   - Rate-based rule: IP당 5분/100회 제한
+2. CloudFront 배포:
+   - Origin: 보안 ECS 퍼블릭 IP (포트 3000)
+   - WAF Web ACL 연결
+   - HTTPS only, Redirect HTTP to HTTPS
+
+---
+
+## CI/CD (GitHub Actions)
+
+`master` 브랜치에 `sentinel-share-backend/**` 변경 푸시 시 자동 실행:
+
+```
+build → Docker 이미지 빌드 + ECR 푸시 (:sha + :latest)
+  ├── deploy-vulnerable → 취약 ECS 클러스터 배포
+  └── deploy-secure     → 보안 ECS 클러스터 배포
+```
+
+#### GitHub Secrets 등록 (Settings → Secrets → Actions)
+
+| Secret | 설명 |
+|---|---|
+| `AWS_ACCESS_KEY_ID` | 배포용 IAM 액세스 키 |
+| `AWS_SECRET_ACCESS_KEY` | 배포용 IAM 시크릿 키 |
+| `VULN_ECS_CLUSTER` | 취약 환경 ECS 클러스터 이름 |
+| `VULN_ECS_SERVICE` | 취약 환경 ECS 서비스 이름 |
+| `SECURE_ECS_CLUSTER` | 보안 환경 ECS 클러스터 이름 |
+| `SECURE_ECS_SERVICE` | 보안 환경 ECS 서비스 이름 |
 
 ---
 
 ## 보안 설계
 
-| 레이어 | 적용 내용 |
-|---|---|
-| 네트워크 | CloudFront IP 제한 (ECS SG), HTTPS only, WAF OWASP 룰셋 |
-| 인증 | JWT (HS256), bcrypt 12 rounds, 로그인 15분/10회 rate limit |
-| 권한 | 모든 파일 작업 전 소유권 검사, 공유 토큰 + 만료 시간 동시 검증 |
-| 스토리지 | S3 완전 비공개, presigned URL (5분 TTL), `uploads/<uuid>/` 불투명 경로 |
-| 애플리케이션 | MIME 타입 + 확장자 + 크기 검증, parameterized SQL (`$1` params) |
-| 시크릿 | AWS Secrets Manager → ECS 태스크 시작 시 환경변수로 주입 |
-| 헤더 | Helmet.js (X-Frame-Options, X-Content-Type-Options 등) |
+| 레이어 | 보안 환경 | 취약 환경 |
+|---|---|---|
+| 네트워크 | CloudFront IP만 허용 (ECS SG), HTTPS only | 0.0.0.0/0 개방 |
+| WAF | Rate-based rule + AWS Managed Rules | 없음 |
+| 인증 | JWT (HS256), bcrypt 12 rounds | 동일 |
+| 파일 권한 | 소유권 검사 + presigned URL (5분 TTL) | 동일 |
+| S3 접근 | Block Public Access ON, Task Role만 허용 | Block Public Access OFF |
+| SQL | parameterized queries 강제 (`$1` params) | 동일 |
+| 시크릿 | Secrets Manager → ECS 환경변수 주입 | 동일 |
+| 헤더 | Helmet.js (X-Frame-Options 등) | 동일 |
 
 ---
 
-## 향후 확장 계획
+## 구현 로드맵
 
-- 업로드 시 ClamAV 또는 AWS Macie를 통한 악성코드 스캔
+| 단계 | 내용 | 상태 |
+|---|---|---|
+| **1단계** | Attack Dashboard AWS 배포 (Dockerfile + CI/CD) | 계획 |
+| **2단계** | AWS 인프라 수동 설치 가이드북 (`docs/`) | 계획 |
+| **3단계** | CI/CD 보안 스캔 (Trivy 이미지 스캔, Prowler 클라우드 스캔) | 계획 |
+| **4단계** | SIEM — Prometheus + Grafana + Loki 스택 구축 | 계획 |
+| **5단계** | Terraform 인프라 자동화 (취약/보안 환경 IaC) | 계획 |
+
+---
+
+## 향후 확장 아이디어
+
+- 업로드 시 ClamAV 또는 AWS Macie 악성코드 스캔
 - 파일 접근 이벤트 감사 로그 테이블
 - 공유 링크 수동 취소 엔드포인트
-- 공유 링크별 다운로드 횟수 추적
 - 관리자 패널 (role 컬럼이 이미 스키마에 포함됨)
-- CloudWatch 알람 (에러율, 레이턴시)
+- Terraform으로 다른 오픈소스 앱 대상 보안 비교 테스트 확장
