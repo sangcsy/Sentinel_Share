@@ -1,0 +1,48 @@
+name: Build Guide PDF
+
+on:
+  push:
+    branches:
+      - feat/pdf-guide
+      - dev
+    paths:
+      - 'guide/**/*.md'
+      - 'guide/images/**'
+      - '.github/workflows/build-guide-pdf.yml'
+  workflow_dispatch:
+
+jobs:
+  build-pdf:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Pandoc and XeLaTeX
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-lang-cjk
+
+      - name: Create pdf directory
+        run: mkdir -p guide/pdf
+
+      - name: Convert Markdown to PDF
+        run: |
+          pandoc guide/Ch1_infra_setup.md \
+            --from markdown \
+            --pdf-engine=xelatex \
+            -V geometry:margin=1in \
+            -V CJKmainfont="Noto Sans CJK KR" \
+            -o guide/pdf/Ch1_infra_setup.pdf
+
+      - name: Commit generated PDF
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add guide/pdf/Ch1_infra_setup.pdf
+          git diff --cached --quiet || git commit -m "docs: auto-generate guide pdf"
+          git push
