@@ -1,166 +1,132 @@
-# 인프라 구축
+# Ch1. AWS 인프라 구축
 
-- **VPC가 왜 필요한가**
+## VPC가 왜 필요한가
 
-AWS에 서버를 만들면 전 세계 수백만 명이 같은 AWS 인프라를 공유하고 있음
+AWS에 서버를 만들면 전 세계 수백만 명이 같은 AWS 인프라를 공유하고 있다.
 
-만약 네트워크가 분리되어 있지 않다면 - 다른 사람이 내 데이터베이스에 접근 가능
+만약 네트워크가 분리되어 있지 않다면  
+다른 사용자가 내 데이터베이스에 접근할 가능성이 존재한다.
 
-**VPC = AWS 안에 나만의 전용 네트워크를 만들어 다른 사람과 완전히 격리된 환경을 제공**
+따라서 AWS에서는 **VPC (Virtual Private Cloud)** 를 통해
 
-- **서브넷은 왜 2개씩 만드는 이유⭐**
-
-`ap-northeast-2a`와 `ap-northeast-2c` 두 곳에 서브넷을 배치 
-
-→하나의 데이터센터에 장애가 발생해도 다른 데이터센터에서 서비스를 계속 실행
-
-⇒ **고가용성(High Availability)**
-
-- 퍼블릭 vs 프라이빗 서브넷 차이
-
-| **구분** | **퍼블릭 서브넷** | **프라이빗 서브넷** |
-| --- | --- | --- |
-| 인터넷에서 접근 | 가능 (IGW 경유) | 불가능 |
-| 인터넷으로 나가기 | 가능 (IGW 경유) | 가능 (NAT GW 경유) |
-| 배치할 리소스 | EC2 (웹 서버), NAT GW, ALB | RDS, ElastiCache, 내부 서버 |
-| 라우트 테이블 | 0.0.0.0/0 → IGW | 0.0.0.0/0 → NAT GW |
-
-**→ 데이터베이스(RDS)**는 반드시 **프라이빗 서브넷**
-
-= 인터넷에서 직접 데이터베이스에 접근할 수 없도록 하는 것이 네트워크 수준의 첫 번째 보안 방어선
-
-→ **NAT 게이트워이**는반드시 **퍼블릭 서브넷**
-
-NAT Gateway = 프라이빗 서브넷의 트래픽을 받아서 **인터넷으로 전달**하는 역할
-
-= 인터넷으로 전달하려면 NAT GW 자체가 인터넷에 접근할 수 있어야 한다
-
-프라이빗 서브넷의 리소스(RDS 등)가 인터넷으로 **나가는 것만** 허용
-
-- Node.js 20 LTS 설치하는 이유
-
-ShopEasy API 서버는 Node.js로 작성되어 있기 때문
+> AWS 내부에 **나만의 전용 네트워크를 만들어 다른 사용자와 완전히 격리된 환경을 제공**한다.
 
 ---
 
-<aside>
-📌
+## 서브넷을 2개씩 만드는 이유 ⭐
 
-VPC 생성 항목
+`ap-northeast-2a` 와 `ap-northeast-2c` 두 개의 AZ에 서브넷을 배치한다.
 
-</aside>
+이렇게 하면
 
-![image.png](image.png)
+- 하나의 데이터센터에 장애가 발생하더라도
+- 다른 데이터센터에서 서비스가 계속 동작한다.
 
-<aside>
-📌
+즉
 
-퍼블릭/프라이빗 서브넷 2개씩 + 멀티 AZ
+**고가용성 (High Availability)** 을 확보할 수 있다.
 
-</aside>
+---
 
-![image.png](image%201.png)
+## 퍼블릭 서브넷 vs 프라이빗 서브넷 차이
 
-![image.png](image%202.png)
+| 구분 | 퍼블릭 서브넷 | 프라이빗 서브넷 |
+|-----|---------------|---------------|
+| 인터넷에서 접근 | 가능 (IGW 경유) | 불가능 |
+| 인터넷으로 나가기 | 가능 (IGW 경유) | 가능 (NAT GW 경유) |
+| 배치 리소스 | EC2, NAT Gateway, ALB | RDS, ElastiCache |
+| 라우트 테이블 | 0.0.0.0/0 → IGW | 0.0.0.0/0 → NAT GW |
 
-![image.png](image%203.png)
+### 중요한 보안 규칙
 
-![image.png](image%204.png)
+- **데이터베이스(RDS)** 는 반드시 **프라이빗 서브넷에 배치**
 
-<aside>
-📌
+→ 인터넷에서 직접 DB 접근을 차단
 
-퍼블릭 서브넷 자동 할당
+이것이 **네트워크 보안의 첫 번째 방어선**
 
-</aside>
+---
 
-![image.png](image%205.png)
+### NAT Gateway 역할
 
-![image.png](image%206.png)
+NAT Gateway는
 
-<aside>
-📌
+> 프라이빗 서브넷의 트래픽을 받아 **인터넷으로 전달하는 역할**
 
-IGW 생성 + VPC 연결
+하지만 NAT Gateway가 인터넷에 접근하려면
 
-</aside>
+- 반드시 **퍼블릭 서브넷에 생성되어야 한다**
 
-![image.png](image%207.png)
+또한
 
-<aside>
-📌
+프라이빗 리소스(RDS 등)는
 
-NAT Gateway 생성 위치/상태
+- **인터넷으로 나가는 것만 허용**
+- **외부에서 직접 접근은 불가능**
 
-</aside>
+---
 
-![image.png](image%208.png)
+## Node.js 20 LTS 설치 이유
 
-<aside>
-📌
+ShopEasy API 서버는 **Node.js 기반**으로 작성되어 있다.
 
-퍼블릭 RT 라우트 + Public 서브넷 연결
+따라서 서버 환경에서도 동일한 런타임을 사용하기 위해
 
-</aside>
+**Node.js 20 LTS 버전을 설치한다.**
 
-![image.png](image%209.png)
+---
 
-![image.png](image%2010.png)
+# VPC 생성 과정
 
-<aside>
-📌
+## VPC 생성 항목
 
-프라이빗 RT 라우트 + Private 서브넷 연결
+![VPC 생성](images/image.png)
 
-</aside>
+---
 
-![image.png](image%2011.png)
+## 퍼블릭 / 프라이빗 서브넷 2개씩 생성 (Multi-AZ)
 
-![image.png](image%2012.png)
+![Subnet 설정](images/image-1.png)
 
-<aside>
-📌
+![Subnet 설정](images/image-2.png)
 
-보안 그룹이 ShopEasy-VPC에 생성 + 규칙 포함
+![Subnet 설정](images/image-3.png)
 
-</aside>
+![Subnet 설정](images/image-4.png)
 
-![image.png](c1f5b7bc-e3ab-4d4b-9aad-60ba9c477876.png)
+---
 
-<aside>
-📌
+## 퍼블릭 서브넷 자동 IP 할당
 
-키 페어 생성 + pem 보관
+퍼블릭 서브넷에 생성되는 EC2 인스턴스는  
+자동으로 **Public IP** 를 할당받도록 설정한다.
 
-</aside>
+![Public IP](images/image-5.png)
 
-![image.png](image%2013.png)
+![Public IP](images/image-6.png)
 
-<aside>
-📌
+---
 
-인스턴스 상세 요약
+## Internet Gateway 생성 및 VPC 연결
 
-</aside>
+VPC에서 인터넷 접근을 허용하기 위해  
+**Internet Gateway(IGW)** 를 생성하고 VPC에 연결한다.
 
-![image.png](image%2014.png)
+![IGW 생성](images/image-7.png)
 
-<aside>
-📌
+---
 
-SSH 접속된 터미널 + node 버전
+## NAT Gateway 생성
 
-</aside>
+프라이빗 서브넷에서 인터넷으로 나가기 위해  
+**NAT Gateway** 를 생성한다.
 
-![image.png](image%2015.png)
+NAT Gateway는 **반드시 퍼블릭 서브넷에 생성해야 한다.**
 
-<aside>
-📌
+![NAT Gateway](images/image-8.png)
 
-API 응답 화면
+---
 
-</aside>
+## 퍼블릭 라우트 테이블 설정
 
-![image.png](image%2016.png)
-
-![image.png](e513c1ec-0c06-4d21-a8f6-29e7e575d4da.png)
+퍼블릭 서브넷의 라우트 테이블
