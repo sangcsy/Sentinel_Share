@@ -31,19 +31,19 @@
       "secrets": [
         {
           "name": "VULNERABLE_API_URL",
-          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:833453046706:secret:cloudshield/dashboard/vulnerable-api-url"
+          "valueFrom": "cloudshield/dashboard/vulnerable-api-url"
         },
         {
           "name": "VULNERABLE_S3_BUCKET",
-          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:833453046706:secret:cloudshield/dashboard/vulnerable-s3-bucket"
+          "valueFrom": "cloudshield/dashboard/vulnerable-s3-bucket"
         },
         {
           "name": "AWS_API_URL",
-          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:833453046706:secret:cloudshield/dashboard/aws-api-url"
+          "valueFrom": "cloudshield/dashboard/aws-api-url"
         },
         {
           "name": "AWS_S3_BUCKET",
-          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:833453046706:secret:cloudshield/dashboard/aws-s3-bucket"
+          "valueFrom": "cloudshield/dashboard/aws-s3-bucket"
         }
       ],
       "logConfiguration": {
