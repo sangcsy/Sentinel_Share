@@ -31,19 +31,21 @@ jobs:
           sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-lang-cjk fonts-noto-cjk
 
       - name: Build guide PDFs
+        working-directory: guide
         run: |
-          mkdir -p guide/pdf
+          mkdir -p pdf
           shopt -s nullglob
 
-          for md_file in guide/*.md; do
-            base_name="$(basename "$md_file" .md)"
+          for md_file in *.md; do
+            base_name="${md_file%.md}"
 
             pandoc "$md_file" \
               --from markdown \
+              --resource-path=. \
               --pdf-engine=xelatex \
               -V geometry:margin=1in \
               -V CJKmainfont="Noto Sans CJK KR" \
-              -o "guide/pdf/${base_name}.pdf"
+              -o "pdf/${base_name}.pdf"
           done
 
       - name: Upload generated PDFs
