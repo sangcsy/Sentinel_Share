@@ -61,7 +61,16 @@ aws s3api put-public-access-block \\
   --public-access-block-configuration \\
     "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"`} />
           </CliContent>
-          <ConsoleContent />
+          <ConsoleContent>
+            <ol className="space-y-2 text-sm text-slate-400 list-decimal list-inside">
+              <li>AWS 콘솔 상단 검색창에 <code className="font-mono text-slate-300">S3</code> 검색 → S3 클릭</li>
+              <li>우측 상단 <span className="text-slate-200">버킷 만들기</span> 클릭</li>
+              <li>버킷 이름 입력 → 리전: <code className="font-mono text-slate-300">ap-northeast-2</code> 선택</li>
+              <li>객체 소유권: <span className="text-slate-200">ACL 비활성화됨</span> 유지</li>
+              <li>퍼블릭 액세스 차단 설정: 4개 항목 모두 체크 확인</li>
+              <li><span className="text-slate-200">버킷 만들기</span> 클릭</li>
+            </ol>
+          </ConsoleContent>
         </StepCard>
 
         {/* Step 2: S3 버킷 정책 */}
