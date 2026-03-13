@@ -21,28 +21,48 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.ref_name }}
 
       - name: Install Pandoc and XeLaTeX
         run: |
           sudo apt-get update
-          sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-lang-cjk
+          sudo apt-get install -y pandoc texlive-xetex texlive-fonts-recommended texlive-lang-cjk fonts-noto-cjk
 
-      - name: Create pdf directory
-        run: mkdir -p guide/pdf
-
-      - name: Convert Markdown to PDF
+      - name: Build guide PDFs
         run: |
-          pandoc guide/Ch1_infra_setup.md \
-            --from markdown \
-            --pdf-engine=xelatex \
-            -V geometry:margin=1in \
-            -V CJKmainfont="Noto Sans CJK KR" \
-            -o guide/pdf/Ch1_infra_setup.pdf
+          mkdir -p guide/pdf
+          shopt -s nullglob
+
+          for md_file in guide/*.md; do
+            base_name="$(basename "$md_file" .md)"
+
+            pandoc "$md_file" \
+              --from markdown \
+              --pdf-engine=xelatex \
+              -V geometry:margin=1in \
+              -V CJKmainfont="Noto Sans CJK KR" \
+              -o "guide/pdf/${base_name}.pdf"
+          done
+
+      - name: Upload generated PDFs
+        uses: actions/upload-artifact@v4
+        with:
+          name: guide-pdf
+          path: guide/pdf/*.pdf
+          if-no-files-found: error
 
       - name: Commit generated PDF
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add guide/pdf/Ch1_infra_setup.pdf
-          git diff --cached --quiet || git commit -m "docs: auto-generate guide pdf"
-          git push
+          git add guide/pdf/*.pdf
+
+          if git diff --cached --quiet; then
+            echo "No PDF changes to commit."
+            exit 0
+          fi
+
+          git commit -m "docs: auto-generate guide pdf"
+          git push origin "${GITHUB_REF_NAME}"
