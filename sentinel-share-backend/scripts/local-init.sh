@@ -64,5 +64,5 @@ echo "    Migrations complete."
 
 echo ""
 echo "==> Local environment ready."
-echo "    백엔드 시작:    cp .env.local .env && npm run dev"
+echo "    백엔드 시작:    cp .env.local.example .env && npm run dev"
 echo "    프론트엔드 시작: cd ../sentinel-share-frontend && echo 'NEXT_PUBLIC_API_URL=http://localhost:3000' > .env.local && npm run dev -- -p 3001"

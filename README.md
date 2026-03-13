@@ -157,9 +157,20 @@ shared_links  id, file_id, token, expires_at, created_by, created_at
 | Docker Desktop | 실행 중 상태여야 함 |
 | Node.js 20+ | |
 | AWS CLI | local-init.sh에서 버킷 생성에 사용 |
-| psql 클라이언트 | PostgreSQL 설치 시 포함 |
+| psql 클라이언트 | `local-init.sh` DB 마이그레이션 실행용 — **로컬 전용**, AWS 배포 시 불필요 |
 
-> **Windows 주의사항**
+> **psql 설치 안내**
+> `psql`은 `local-init.sh`에서 DB 마이그레이션을 실행할 때만 사용합니다.
+> PostgreSQL 서버 설치가 아닌 **클라이언트만** 있으면 됩니다.
+> AWS 배포 시에는 불필요합니다 — RDS 마이그레이션은 ECS 태스크 또는 RDS Query Editor에서 처리합니다.
+>
+> **macOS/Linux:**
+> ```bash
+> brew install postgresql   # macOS
+> apt install postgresql-client   # Ubuntu/Debian
+> ```
+>
+> **Windows:**
 > `winget install PostgreSQL.PostgreSQL.16` 으로 설치하면 PostgreSQL 서버도 함께 설치되어
 > 5432 포트를 점유합니다. **관리자 권한 PowerShell**에서 실행해 비활성화하세요:
 > ```powershell
@@ -174,7 +185,7 @@ shared_links  id, file_id, token, expires_at, created_by, created_at
 cd sentinel-share-backend
 docker compose up -d
 bash scripts/local-init.sh    # 최초 1회
-cp .env.local .env
+cp .env.local.example .env
 npm install && npm run dev    # → http://localhost:3000
 
 # 2. 프론트엔드 (새 터미널)
@@ -351,7 +362,7 @@ build → Docker 이미지 빌드 + ECR 푸시 (:sha + :latest)
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| **1단계** | Attack Dashboard AWS 배포 (Dockerfile + CI/CD) | 계획 |
+| **1단계** | Attack Dashboard AWS 배포 (Dockerfile + CI/CD) | 완료 |
 | **2단계** | AWS 인프라 수동 설치 가이드북 (`docs/`) | 계획 |
 | **3단계** | CI/CD 보안 스캔 (Trivy 이미지 스캔, Prowler 클라우드 스캔) | 계획 |
 | **4단계** | SIEM — Prometheus + Grafana + Loki 스택 구축 | 계획 |
