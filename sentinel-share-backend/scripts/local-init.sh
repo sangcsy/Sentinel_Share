@@ -16,7 +16,7 @@ DB_PASSWORD="localpassword"
 
 # Windows에서 psql이 PATH에 없을 경우 자동으로 추가
 if ! command -v psql &>/dev/null; then
-  PG_BIN="/c/Program Files/PostgreSQL/16/bin"
+  PG_BIN="/c/Program Files/PostgreSQL/17/bin"
   if [ -f "${PG_BIN}/psql" ] || [ -f "${PG_BIN}/psql.exe" ]; then
     export PATH="$PATH:${PG_BIN}"
     echo "    psql PATH 추가: ${PG_BIN}"

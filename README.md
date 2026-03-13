@@ -171,11 +171,11 @@ shared_links  id, file_id, token, expires_at, created_by, created_at
 > ```
 >
 > **Windows:**
-> `winget install PostgreSQL.PostgreSQL.16` 으로 설치하면 PostgreSQL 서버도 함께 설치되어
+> `winget install PostgreSQL.PostgreSQL.17` 으로 설치하면 PostgreSQL 서버도 함께 설치되어
 > 5432 포트를 점유합니다. **관리자 권한 PowerShell**에서 실행해 비활성화하세요:
 > ```powershell
-> Stop-Service -Name 'postgresql-x64-16' -Force
-> Set-Service -Name 'postgresql-x64-16' -StartupType Disabled
+> Stop-Service -Name 'postgresql-x64-17' -Force
+> Set-Service -Name 'postgresql-x64-17' -StartupType Disabled
 > ```
 
 ### 실행 순서
@@ -202,7 +202,7 @@ npm install && npm run dev          # → http://localhost:3002
 ### DB 직접 접속
 
 ```bash
-export PATH="$PATH:/c/Program Files/PostgreSQL/16/bin"
+export PATH="$PATH:/c/Program Files/PostgreSQL/17/bin"
 export PGPASSWORD="localpassword"
 psql -h 127.0.0.1 -p 5432 -U sentinelshare_user -d sentinelshare
 ```

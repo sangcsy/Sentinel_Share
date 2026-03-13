@@ -90,7 +90,7 @@ aws rds create-db-instance \\
   --db-instance-identifier sentinelshare-vulnerable \\
   --db-instance-class db.t3.micro \\
   --engine postgres \\
-  --engine-version 16 \\
+  --engine-version 17.9 \\
   --master-username sentinelshare_user \\
   --master-user-password YOUR_DB_PASSWORD \\
   --db-name sentinelshare \\

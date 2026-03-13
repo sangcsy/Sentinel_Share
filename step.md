@@ -104,11 +104,11 @@ git --version
 ```
 
 > **Windows 전용 주의사항**
-> `winget install PostgreSQL.PostgreSQL.16` 으로 설치했다면 로컬 PostgreSQL 서비스가
+> `winget install PostgreSQL.PostgreSQL.17` 으로 설치했다면 로컬 PostgreSQL 서비스가
 > 5432 포트를 점유해 Docker와 충돌한다. **관리자 권한 PowerShell**에서 아래를 실행한다.
 > ```powershell
-> Stop-Service -Name 'postgresql-x64-16' -Force
-> Set-Service -Name 'postgresql-x64-16' -StartupType Disabled
+> Stop-Service -Name 'postgresql-x64-17' -Force
+> Set-Service -Name 'postgresql-x64-17' -StartupType Disabled
 > ```
 
 AWS CLI 인증 설정 (최초 1회):
@@ -309,7 +309,7 @@ docker push [계정ID].dkr.ecr.ap-northeast-2.amazonaws.com/sentinelshare-dashbo
 |---|---|---|
 | 생성 방식 | | 표준 생성 |
 | 엔진 옵션 | 엔진 유형 | PostgreSQL |
-| | 엔진 버전 | PostgreSQL 16.x (최신) |
+| | 엔진 버전 | PostgreSQL 17.9 |
 | 템플릿 | | 프리 티어 |
 | 설정 | DB 인스턴스 식별자 | `sentinelshare-vulnerable` |
 | | 마스터 사용자 이름 | `sentinelshare_user` |
