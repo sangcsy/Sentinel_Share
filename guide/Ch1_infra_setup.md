@@ -130,3 +130,58 @@ NAT Gateway는 **반드시 퍼블릭 서브넷에 생성해야 한다.**
 ## 퍼블릭 라우트 테이블 설정
 
 퍼블릭 서브넷의 라우트 테이블
+
+![Public Route](images/image-9.png)
+
+![Public Route](images/image-10.png)
+
+---
+
+## 프라이빗 라우트 테이블 설정
+
+프라이빗 서브넷의 라우트 테이블
+
+![Private Route](images/image-11.png)
+
+![Private Route](images/image-12.png)
+
+---
+
+## 보안 그룹 생성
+
+ShopEasy VPC에 보안 그룹을 생성하고  
+필요한 인바운드 / 아웃바운드 규칙을 설정한다.
+
+![Security Group](images/c1f5b7bc-e3ab-4d4b-9aad-60ba9c477876.png)
+
+---
+
+## 키 페어 생성
+
+EC2 SSH 접속을 위해 **Key Pair** 를 생성한다.
+
+- `.pem` 파일을 안전하게 보관해야 한다.
+
+![Key Pair](images/image-13.png)
+
+---
+
+## EC2 인스턴스 생성 결과
+
+인스턴스 생성 후 확인 가능한 정보
+
+- Instance ID
+- Public IP
+- Instance Type
+
+![Instance](images/image-14.png)
+
+---
+
+## SSH 접속 및 Node.js 확인
+
+EC2 서버에 SSH 접속 후  
+Node.js 버전을 확인한다.
+
+```bash
+node -v
