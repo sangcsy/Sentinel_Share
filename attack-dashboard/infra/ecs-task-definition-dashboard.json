@@ -1,5 +1,4 @@
 {
-  "comment": "배포 전 833453046706를 실제 AWS 계정 ID로 교체하세요.",
   "family": "cloudshield-dashboard",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
