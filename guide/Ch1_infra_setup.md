@@ -184,4 +184,5 @@ EC2 서버에 SSH 접속 후
 Node.js 버전을 확인한다.
 
 ```bash
+
 node -v
