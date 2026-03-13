@@ -10,7 +10,7 @@ on:
 
 env:
   AWS_REGION: ap-northeast-2
-  ECR_REPOSITORY: sentinelshare-dashboard
+  ECR_REPOSITORY: cloudshield-dashboard
 
 jobs:
   # ──────────────────────────────────────────────────────────────
@@ -78,7 +78,7 @@ jobs:
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
           task-definition: attack-dashboard/infra/ecs-task-definition-dashboard.json
-          container-name: sentinelshare-dashboard
+          container-name: cloudshield-dashboard
           image: ${{ needs.build.outputs.image-tag }}
 
       - name: Deploy to ECS
