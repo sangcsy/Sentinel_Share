@@ -1,16 +1,16 @@
 {
-  "comment": "배포 전 ACCOUNT_ID를 실제 AWS 계정 ID로 교체하세요.",
+  "comment": "배포 전 833453046706를 실제 AWS 계정 ID로 교체하세요.",
   "family": "cloudshield-dashboard",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
   "memory": "1024",
-  "executionRoleArn": "arn:aws:iam::ACCOUNT_ID:role/cloudshield-dashboard-execution-role",
-  "taskRoleArn": "arn:aws:iam::ACCOUNT_ID:role/cloudshield-dashboard-task-role",
+  "executionRoleArn": "arn:aws:iam::833453046706:role/cloudshield-dashboard-execution-role",
+  "taskRoleArn": "arn:aws:iam::833453046706:role/cloudshield-dashboard-task-role",
   "containerDefinitions": [
     {
       "name": "cloudshield-dashboard",
-      "image": "ACCOUNT_ID.dkr.ecr.ap-northeast-2.amazonaws.com/cloudshield-dashboard:latest",
+      "image": "833453046706.dkr.ecr.ap-northeast-2.amazonaws.com/cloudshield-dashboard:latest",
       "essential": true,
       "portMappings": [
         {
@@ -32,19 +32,19 @@
       "secrets": [
         {
           "name": "VULNERABLE_API_URL",
-          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:cloudshield/dashboard/vulnerable-api-url"
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:833453046706:secret:cloudshield/dashboard/vulnerable-api-url"
         },
         {
           "name": "VULNERABLE_S3_BUCKET",
-          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:cloudshield/dashboard/vulnerable-s3-bucket"
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:833453046706:secret:cloudshield/dashboard/vulnerable-s3-bucket"
         },
         {
           "name": "AWS_API_URL",
-          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:cloudshield/dashboard/aws-api-url"
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:833453046706:secret:cloudshield/dashboard/aws-api-url"
         },
         {
           "name": "AWS_S3_BUCKET",
-          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:ACCOUNT_ID:secret:cloudshield/dashboard/aws-s3-bucket"
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:833453046706:secret:cloudshield/dashboard/aws-s3-bucket"
         }
       ],
       "logConfiguration": {
